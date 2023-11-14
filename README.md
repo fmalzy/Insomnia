@@ -18,7 +18,7 @@ This repository is dedicated to documenting the analysis of insomnia in adolesce
 #### 10/26 Working Session
 - **Exploratory Analysis and Presentation Preparation**
   - Contributors: Jane, Freya (Analysis), Joseph (Presentation)
-  - Updates: R markdown files uploaded to script folder.
+  - Updates: R markdown files uploaded to the script folder.
 
 #### 10/31 Working Session
 - **Additional Analysis and Research**
@@ -28,5 +28,11 @@ This repository is dedicated to documenting the analysis of insomnia in adolesce
 #### 11/07 Working Session
 - **Final Analysis and Presentation Rehearsal**
   - Contributors: Jane, Freya (Analysis), Joseph (Research), Ashlee (Presentation Review)
-  - Activities: Reviewed and practiced the presentation, confirmed questions and resolved confusions.
+  - Activities: Reviewed and practiced the presentation, confirmed questions, and resolved confusion.
+
+#### Collaborators
+This project is the result of collaborative efforts by a talented team. Below are the contributors to this project along with our respective GitHub profile links:
+- **[Freya Ma](https://github.com/fmalzy)** 
+- **[Jane Han](https://github.com/han-jane)** 
+- **[Joseph Nano](https://github.com/josephnano)** 
 
