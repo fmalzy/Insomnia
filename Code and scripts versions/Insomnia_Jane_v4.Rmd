@@ -1,0 +1,591 @@
+---
+title: "insomnia"
+author: "Jane Han"
+date: "2023-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r insomnia}
+#install.packages("utils")
+library(utils)
+
+#setwd("/Users/mindmatter/Dropbox (Dartmouth College)/Courseworks/QBS181/Project_Insomnia")
+data <- read.csv("./data/insomnia_data_cleaned.csv", header = TRUE)
+
+setwd("/Users/freyam/Desktop/Dartmouth/Courses/002 Fall Term/001_Core Courses/QBS 181 - Data Wrangling /Final Group Project/Codes and cleaned data")
+data <- read.csv("Insomnia_final.csv")
+
+# data check 
+#summary(data)
+head(data, 30)
+```
+
+## Insomnia Data regression check 
+check the regression between two columns 
+columns: ISI_total - GCTI_total
+analysis: pearson correlation 
+```{r}
+# Compute the Pearson correlation coefficient
+correlation_coefficient <- cor(data$ISI_total, data$GCTI_total, method = "pearson")
+
+# Print the result
+print(correlation_coefficient)
+
+correlation_test <- cor.test(data$ISI_total, data$GCTI_total)
+
+# Print the results
+print(correlation_test)
+```
+
+## Scatter Plot
+
+```{r pressure, echo=FALSE}
+# Scatter plot
+plot(data$ISI_total, data$GCTI_total, main="Scatter plot of ISI_total vs GCTI_total",
+     xlab="ISI_total", ylab="GCTI_total", col="blue", pch=16)
+
+# Add a regression line to the plot
+abline(lm(data$GCTI_total ~ data$ISI_total), col="red")
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Self Feedback for future analysis, notes
+[_] could just make a heatmap of all columns as well?
+
+```{r}
+# Assuming 'data' is your data frame containing all the variables
+
+# List of column names for which you want to calculate pairwise correlations
+columns_to_analyze <- c("PDS_FEMALE", "PDS_MALE", "ISI_total", "PSQI_total", "BDI_total",
+                        "ASHS_total", "ASHS_physiological", "ASHS_cognitive", "ASHS_emotional", 
+                        "ASHS_SleepEnvirnmont", "ASHS_DaytimeSleep", "ASHS_substances", 
+                        "ASHS_bedtimeRoutine", "ASHS_sleepStability", "ASHS_BedroomSharing", 
+                        "DBAS_total", "FIRST_total", "GCTI_total", "GCTI_anxiety", "GCTI_reflection",
+                        "GCTI_worries", "GCTI_thoughts", "GCTI_negativeAffect", "STAI_Y_total", 
+                        "NEO_neuroticism", "NEO_extraversion", "NEO_openness", "NEO_agreeableness", 
+                        "NEO_Conscientiousness", "MEQr_total", "PSRS_PrR", "PSRS_RWO", "PSRS_RSC", 
+                        "PSRS_FRa", "PSRS_RSE", "PSRS_total", "PSS_total", "TCQI_R_Total", 
+                        "TCQIR_Aggressive_supression", "TCQIR_cognitive_distraction", "TCQIR_reappraisal", 
+                        "TCQIR_behavtioral_distraction", "TCQIR_social_avoidance", "TCQIR_worry", 
+                        "ACE_tot", "asq_home", "asq_school", "asq_attendance", "asq_romantic", "asq_peer",
+                        "asq_teacher", "asq_future", "asq_leisure", "asq_finance", "asq_responsibility",
+                        "casq_total", "casq_sleepy", "casq_alert", "cope_disengage_su", "cope_growth",
+                        "cope_disengage_mental", "cope_emotions", "cope_socialsupp_instr", "cope_active",
+                        "cope_denial", "cope_religion", "cope_humor", "cope_disengage_emo", "cope_restraint",
+                        "cope_socialsupp_emo", "cope_acccept", "cope_suppression", "cope_planning",
+                        "ders_nonaccpetance", "ders_total", "ders_goals", "ders_impulse", "ders_awareness",
+                        "ders_strategies", "ders_clarity")
+
+# Create an empty list to store the results
+correlation_results <- list()
+
+# Generate all combinations of the column names
+column_combinations <- combn(columns_to_analyze, 2)
+
+# Function to calculate Pearson correlation for a pair
+calculate_correlation <- function(column_pair) {
+  col1 <- data[[column_pair[1]]]
+  col2 <- data[[column_pair[2]]]
+  complete_cases <- complete.cases(col1, col2)
+  
+  # Check if there are enough complete cases
+  if (sum(complete_cases) > 2) {  # More than two observations are needed to calculate correlation
+    result <- cor.test(col1[complete_cases], col2[complete_cases], method = "pearson")
+    return(list(column_pair = column_pair, correlation_coefficient = result$estimate, 
+                p_value = result$p.value, method = "pearson"))
+  } else {
+    return(list(column_pair = column_pair, correlation_coefficient = NA, 
+                p_value = NA, method = "pearson", 
+                warning = "Not enough finite observations"))
+  }
+}
+
+# Apply the function to each pair
+correlation_results <- apply(column_combinations, 2, calculate_correlation)
+
+# Convert the results to a data frame, including a warning column for pairs with insufficient data
+correlation_df <- do.call(rbind, lapply(correlation_results, function(x) {
+  data.frame(column1 = x$column_pair[1], column2 = x$column_pair[2],
+             correlation_coefficient = x$correlation_coefficient,
+             p_value = x$p_value, warning = ifelse(is.na(x$correlation_coefficient), x$warning, ""))
+}))
+
+# View the dataframe
+View(correlation_df)
+
+```
+
+
+# visualize with heatmap only when the p-value is significant (less than 0.05)
+
+```{r}
+# Assuming correlation_df is your dataframe with all correlation results
+significant_correlations <- correlation_df[correlation_df$p_value < 0.05, ]
+
+# Extract the unique column names that appear in the significant correlations
+columns_in_significant_correlations <- unique(c(significant_correlations$column1, significant_correlations$column2))
+
+# Create a blank matrix for the heatmap
+correlation_matrix <- matrix(NA, 
+                             nrow = length(columns_in_significant_correlations), 
+                             ncol = length(columns_in_significant_correlations),
+                             dimnames = list(columns_in_significant_correlations, columns_in_significant_correlations))
+
+# Fill in the matrix with the significant correlation coefficients
+for(i in 1:nrow(significant_correlations)) {
+  row <- significant_correlations[i, ]
+  col1 <- which(columns_in_significant_correlations == row$column1)
+  col2 <- which(columns_in_significant_correlations == row$column2)
+  correlation_matrix[col1, col2] <- row$correlation_coefficient
+  correlation_matrix[col2, col1] <- row$correlation_coefficient  # For symmetry
+}
+
+# Since we only have significant correlations, we can replace NA with 0 for better visualization
+correlation_matrix[is.na(correlation_matrix)] <- 0
+
+# Plot the heatmap
+library(ggplot2)
+
+# Melt the matrix for ggplot
+library(reshape2)
+melted_correlation_matrix <- melt(correlation_matrix)
+
+# Create the heatmap
+ggplot(data = melted_correlation_matrix, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1), space = "Lab", name="Pearson\nCorrelation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        axis.title = element_blank())
+
+ggsave("heatmap.png", plot = last_plot(), width = 12, height = 10, dpi = 300)
+
+```
+
+
+
+```{r}
+#install.packages("plotly")
+library(plotly)
+
+# Convert the melted matrix for plotly
+plotly_data <- as.data.frame(melted_correlation_matrix)
+
+# Create the plotly interactive heatmap
+plot_ly(x = plotly_data$Var2, y = plotly_data$Var1, z = plotly_data$value, 
+        type = "heatmap", colors = colorRamp(c("blue", "white", "red")))
+```
+comment: 
+Clustering - Sometimes clustering the rows and columns can lead to a more readable heatmap. Many heatmap functions have built-in clustering features that you can enable.
+
+freya's comment
+
+we have think of now choosing from these exploratory data/combination
+
+figure out how to incoorporate population analysis 
+
+```{r}
+# Assuming 'data' is your dataframe and it has columns 'Asian' and 'White' along with the variable of interest, for example 'ISI_total'
+# Create a new race factor variable where 1 represents 'White' and 2 represents 'Asian'
+data$Race <- NA  # Create an empty column for race
+data$Race[data$White == 1] <- 'White'
+data$Race[data$Asian == 1] <- 'Asian'
+
+# Convert the new Race column to a factor
+data$Race <- factor(data$Race)
+
+# Now, select only the rows where Race is 'Asian' or 'White'
+data_subset <- data[data$Race %in% c('Asian', 'White'), ]
+
+# Run a two-way ANOVA with Race and ISI_total (as an example)
+# Replace 'ISI_total' with the variable of interest from your heatmap
+result <- aov(ISI_total ~ Race , data = data_subset)
+summary(result)
+
+
+```
+
+```{r}
+# Assuming 'data' is your dataframe and it has columns 'Asian' and 'White' along with the variable of interest, for example 'ISI_total'
+# Create a new race factor variable where 1 represents 'White' and 2 represents 'Asian'
+data$Race <- NA  # Create an empty column for race
+data$Race[data$White == 1] <- 'White'
+data$Race[data$Asian == 1] <- 'Asian'
+
+# Convert the new Race column to a factor
+data$Race <- factor(data$Race)
+
+# Now, select only the rows where Race is 'Asian' or 'White'
+data_subset <- data[data$Race %in% c('Asian', 'White'), ]
+
+# Run a two-way ANOVA with Race and ISI_total (as an example)
+# Replace 'ISI_total' with the variable of interest from your heatmap
+result_gcti_isi <- aov(ISI_total ~ Race + GCTI_total + Race:GCTI_total, data = data_subset)
+summary(result_gcti_isi)
+
+```
+```{r}
+# Run a two-way ANOVA with Race and ISI_total
+result_isi_bdi <- aov(BDI_total ~ Race + ISI_total + Race:ISI_total, data = data_subset)
+summary(result_isi_bdi)
+```
+```{r}
+# Run a two-way ANOVA with Race and ISI_total
+result_ashs_bdi <- aov(BDI_total ~ Race + ASHS_total + Race:ASHS_total, data = data_subset)
+summary(result_ashs_bdi)
+```
+
+
+# White and Asian
+with Insomnia data
+```{r}
+library(ggplot2)
+
+# Create a new dataframe that contains the means of the dependent variable for each combination
+# of levels of the independent variables.
+# group_means <- aggregate(BDI_total ~ Race + ISI_total + ASHS_total, data = data, FUN = mean)
+
+# Interaction plot for Race and ISI_total
+ggplot(data_subset, aes(x = ISI_total, y = BDI_total, color = Race, group = Race)) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color ="grey") +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Interaction of Race, Insomnia Severity, and Depression", x = "ISI_total", y = "BDI_total")
+
+# Interaction plot for Race and ASHS_total
+ggplot(data_subset, aes(x = ASHS_total, y = BDI_total, color = Race, group = Race)) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color ="grey") +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Interaction of  Race, Sleep Hygiene, and Depression", x = "ASHS_total", y = "BDI_total")
+```
+
+# All race
+with Insomnia_Final data
+```{r}
+library(ggplot2)
+
+# Create a new dataframe that contains the means of the dependent variable for each combination
+# of levels of the independent variables.
+# group_means <- aggregate(BDI_total ~ Race + ISI_total + ASHS_total, data = data, FUN = mean)
+
+# Interaction plot for Race and ISI_total
+ggplot(Insomnia_Final, aes(x = ISI_total, y = BDI_total, color = Race, group = Race)) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color ="grey") +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Interaction of Race and ISI_total", x = "ISI_total", y = "BDI_total")
+
+# Interaction plot for Race and ASHS_total
+ggplot(Insomnia_Final, aes(x = ASHS_total, y = BDI_total, color = Race, group = Race)) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color ="grey") +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Interaction of Race and ASHS", x = "ASHS_total", y = "BDI_total")
+```
+
+
+```{r}
+library(ggplot2)
+
+# Calculate the means for each group
+group_means <- aggregate(ISI_total ~ Race + GCTI_total, data = data_subset, mean)
+
+# Convert the other_variable to a factor if it's not already
+group_means$GCTI_total <- factor(group_means$GCTI_total)
+
+# Plotting
+ggplot(group_means, aes(x = GCTI_total, y = ISI_total, group = Race, color = Race)) +
+  geom_line() +  # Add the lines for each Race
+  geom_point() + # Add the points to indicate observed group means
+  theme_minimal() +
+  labs(x = "Mean of GCTI_total", y = "Mean of ISI_total", title = "Interaction Plot for Two-way ANOVA")
+
+```
+
+
+
+```{r}
+library(ggplot2)
+
+# Calculate the means for each group
+group_means <- aggregate(ISI_total ~ Race + PSQI_total, data = data_subset, mean)
+
+# Convert the other_variable to a factor if it's not already
+group_means$PSQI_total <- factor(group_means$PSQI_total)
+
+# Plotting
+ggplot(group_means, aes(x = PSQI_total, y = ISI_total, group = Race, color = Race)) +
+  geom_line() +  # Add the lines for each Race
+  geom_point() + # Add the points to indicate observed group means
+  theme_minimal() +
+  labs(x = "Mean of PSQI_total", y = "Mean of ISI_total", title = "Interaction Plot for Two-way ANOVA")
+```
+
+```{r}
+library(ggplot2)
+
+# Calculate the means for each group
+group_means <- aggregate(ISI_total ~ Race + PDS_MALE, data = data_subset, mean)
+
+# Convert the other_variable to a factor if it's not already
+group_means$PDS_MALE <- factor(group_means$PDS_MALE)
+
+# Plotting
+ggplot(group_means, aes(x = PDS_MALE, y = ISI_total, group = Race, color = Race)) +
+  geom_line() +  # Add the lines for each Race
+  geom_point() + # Add the points to indicate observed group means
+  theme_minimal() +
+  labs(x = "Mean of PDS_MALE", y = "Mean of ISI_total", title = "Interaction Plot for Two-way ANOVA")
+```
+
+```{r}
+library(ggplot2)
+
+# Calculate the means for each group
+group_means <- aggregate(ISI_total ~ Race + SubGroup, data = data_subset, mean)
+
+# Convert the other_variable to a factor if it's not already
+group_means$SubGroup <- factor(group_means$SubGroup)
+
+# Plotting
+ggplot(group_means, aes(x = SubGroup, y = ISI_total, group = SubGroup, color = SubGroup)) +
+  geom_line() +  # Add the lines for each Race
+  geom_point() + # Add the points to indicate observed group means
+  theme_minimal() +
+  labs(x = "Mean of SubGroup", y = "Mean of ISI_total", title = "Plot for Two-way ANOVA")
+```
+
+```{r}
+library(ggplot2)
+
+# Calculate the means for each group
+group_means <- aggregate(ISI_total ~ Race + Group, data = data_subset, mean)
+
+# Convert the other_variable to a factor if it's not already
+group_means$SubGroup <- factor(group_means$Group)
+
+# Plotting
+ggplot(group_means, aes(x = Group, y = ISI_total, group = Group, color = Group)) +
+  geom_line() +  # Add the lines for each Race
+  geom_point() + # Add the points to indicate observed group means
+  theme_minimal() +
+  labs(x = "Mean of Group", y = "Mean of ISI_total", title = "Plot for Two-way ANOVA")
+```
+```{r}
+library(ggplot2)
+
+# Create a new dataframe that contains the means of the dependent variable for each combination
+# of levels of the independent variables.
+group_means <- aggregate(BDI_total ~ Race + ISI_total + ASHS_total, data = data, FUN = mean)
+
+# Interaction plot for Race and ISI_total
+ggplot(group_means, aes(x = ISI_total, y = BDI_total, color = Race, group = Race)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Interaction of Race and ISI_total", x = "ISI_total", y = "BDI_total")
+
+# Interaction plot for Race and ASHS_total
+ggplot(group_means, aes(x = ASHS_total, y = BDI_total, color = Race, group = Race)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Interaction of Race, ASHS, and BDI", x = "ASHS_total", y = "BDI_total")
+
+```
+
+
+```{r}
+library(gridExtra)
+library(ggplot2)
+
+# Define the variables and titles
+variables <- c("ASHS_total")
+titles <- c("Depression")
+
+p <- ggplot(Insomnia_Final, aes(x = ASHS_total, y = BDI_total, color = Race)) +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color = "steelblue") +
+  labs(title = paste(title_prefix, "vs", x_var)) +
+  scale_color_brewer(palette = "RdYlGn") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 10), 
+    axis.title = element_text(size = 10), 
+    legend.position = "right", 
+    legend.background = element_rect(fill = "white", colour = "grey50"),
+    legend.text = element_text(size = 5), 
+    legend.title = element_text(face = "bold", size = 7), 
+    legend.key.size = unit(0.5, "lines") 
+  )
+
+# Print the scatter plot
+print(p)
+
+# Relationship between Age, BDI, and ASHS Scores with Race color distinction
+bdi_ashs_scatter <- ggplot(Insomnia_Final, aes(x = ASHS_total, y = BDI_total, color = Race)) +
+  geom_point(aes(size = 0.5), alpha = 0.6) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color = "black") +
+  labs(title = "Relationship between Race, ASHS Scores, and BDI") +
+  scale_color_brewer(palette = "RdYlGn") + 
+  base_theme +
+  theme(legend.title = element_text(size = 8, face = "bold"),
+        legend.text = element_text(size = 8))
+
+# Print the scatter plot
+print(bdi_ashs_scatter)
+```
+
+
+
+
+```{r}
+library(ggplot2)
+
+# Create a new dataframe that contains the means of the dependent variable for each combination
+# of levels of the independent variables.
+group_means <- aggregate(BDI_total ~ Race + ISI_total + ASHS_total, data = data, FUN = mean)
+
+# Interaction plot for ISI_total and ASHS_total
+ggplot(group_means, aes(x = ISI_total, y = BDI_total, color = ASHS_total, group = ASHS_total)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Interaction of ISI, ASHS, and BDI", x = "ISI_total", y = "BDI_total")
+
+```
+
+
+
+
+
+
+
+
+
+## 3-way 
+
+ANOVA analysis 
+
+```{r}
+# Assuming 'data' is your data frame, and it contains 'race', 'group', and 'ISI_total' columns
+# 'race' and 'group' should be converted to factors if they are not already
+
+data$Race <- factor(data$Race)
+
+# Perform the three-way ANOVA
+three_way_anova_result <- aov(BDI_total ~ Race * ISI_total * ASHS_total, data = data)
+
+# Get the summary of the ANOVA
+summary(three_way_anova_result)
+```
+# Visualizations
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+
+# Set the base theme for our plots
+base_theme <- theme_minimal() +
+              theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14, family = "Arial"),
+                    plot.subtitle = element_text(hjust = 0.5))
+color_palette <- scale_fill_brewer(palette = "RdYlGn") 
+
+# BDI Score Distribution by Race
+bdi_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = BDI_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "BDI Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# ASHS Score Distribution by Race
+ashs_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = ASHS_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "ASHS Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# Relationship between Age, BDI, and ASHS Scores with Race color distinction
+bdi_ashs_scatter <- ggplot(Insomnia_Final, aes(x = ASHS_total, y = BDI_total, color = Race)) +
+  geom_point(aes(size = 0.5), alpha = 0.6) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color = "black") +
+  labs(title = "Relationship between Race, ASHS Scores, and BDI") +
+  scale_color_brewer(palette = "RdYlGn") + 
+  base_theme +
+  theme(legend.title = element_text(size = 8, face = "bold"),
+        legend.text = element_text(size = 8))
+
+# Arrange the boxplots in a grid for better comparison
+grid.arrange(bdi_race_boxplot, ashs_race_boxplot, nrow = 2)
+
+# Print the scatter plot
+print(bdi_ashs_scatter)
+
+```
+
+## 4-way 
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+
+# Set the base theme for our plots
+base_theme <- theme_minimal() +
+              theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14, family = "Arial"),
+                    plot.subtitle = element_text(hjust = 0.5))
+color_palette <- scale_fill_brewer(palette = "RdYlGn") 
+
+# BDI Score Distribution by Race
+bdi_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = BDI_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "BDI Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# ASHS Score Distribution by Race
+ashs_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = ASHS_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "ASHS Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# Relationship between Age, BDI, and ASHS Scores with Race color distinction
+age_bdi_ashs_scatter <- ggplot(Insomnia_Final, aes(x = Age, y = BDI_total, color = Race)) +
+  geom_point(aes(size = ASHS_total), alpha = 0.6) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color = "black") +
+  labs(title = "Relationship between Age, Race, ASHS Scores, and BDI") +
+  scale_color_brewer(palette = "RdYlGn") + 
+  base_theme +
+  theme(legend.title = element_text(size = 8, face = "bold"),
+        legend.text = element_text(size = 8))
+
+# Arrange the boxplots in a grid for better comparison
+grid.arrange(bdi_race_boxplot, ashs_race_boxplot, nrow = 2)
+
+# Print the scatter plot
+print(age_bdi_ashs_scatter)
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

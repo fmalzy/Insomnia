@@ -1,0 +1,128 @@
+---
+title: "181_Final Group Project"
+output: pdf_document
+date: "2023-10-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Load in required libraries
+library(ggplot2)
+library(dplyr)
+
+# Read in the data
+Insomnia <- read.csv("insomnia_data_cleaned.csv")
+
+```
+
+
+```{r}
+# Check all column names
+colnames(Insomnia)
+head(Insomnia)
+
+```
+
+```{r}
+# Compare and test correlations
+
+# Combine individual race columns into one
+Insomnia$Race <- case_when(
+  Insomnia$American_Indian == 1 ~ "American_Indian",
+  Insomnia$Asian == 1 ~ "Asian",
+  Insomnia$Native_Hawaiian == 1 ~ "Native_Hawaiian",
+  Insomnia$Black == 1 ~ "Black",
+  Insomnia$White == 1 ~ "White",
+  TRUE ~ "Other"
+)
+
+# List of variable combinations
+combinations <- list(
+  c("GCTI_total", "NEO_agreeableness"),
+  c("ASHS_total", "NEO_neuroticism"),
+  c("ISI_total", "NEO_extraversion"),
+  c("PSQI_total", "NEO_openness"),
+  c("BDI_total", "MEQr_total"),
+  c("ASHS_physiological", "PSRS_total"),
+  c("ASHS_cognitive", "NEO_Conscientiousness"),
+  c("ASHS_emotional", "PSS_total"),
+  c("ASHS_SleepEnvirnmont", "TCQI_R_Total"),
+  c("ASHS_DaytimeSleep", "TCQIR_cognitive_distraction"),
+  c("ASHS_substances", "NEO_agreeableness"),
+  c("ASHS_bedtimeRoutine", "ZNEO_neuroticism"),
+  c("ASHS_sleepStability", "ZNEO_openness"),
+  c("ASHS_BedroomSharing", "ZPSRS_RSE"),
+  c("GCTI_anxiety", "ZTCQIR_reappraisal"),
+  c("GCTI_reflection", "ZSTAI_Y_total"),
+  c("GCTI_worries", "Zders_awareness"),
+  c("GCTI_thoughts", "ZDERS_total")
+)
+
+# Function to plot each combination
+plot_combination <- function(vars) {
+  ggplot(Insomnia, aes_string(x=vars[1], y=vars[2])) + 
+    geom_point(aes(color=Race), alpha=0.6) +
+    geom_smooth(method="lm", se=FALSE, color="black") +
+    labs(title=paste("Scatter Plot of", vars[1], "and", vars[2]), 
+         x=vars[1], 
+         y=vars[2]) +
+    theme_minimal()
+}
+
+# Generate and display plots
+lapply(combinations, plot_combination)
+
+```
+
+
+```{r}
+
+# Load in required libraries
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+# Creating a single race column
+Insomnia <- Insomnia %>%
+  mutate(Race2 = case_when(
+    American_Indian == 1 ~ "American_Indian",
+    Asian == 1 ~ "Asian",
+    Native_Hawaiian == 1 ~ "Native_Hawaiian",
+    Black == 1 ~ "Black",
+    White == 1 ~ "White",
+    TRUE ~ "Unknown"
+  ))
+
+# Reshape the data for plotting
+Insomnia_melted <- melt(Insomnia, id.vars="Race", measure.vars=c("GCTI_total", "ASHS_total"))
+
+# Visualization using ggplot with boxplots
+ggplot(Insomnia_melted, aes(x=Race, y=value, fill=variable)) + 
+  geom_boxplot() +
+  labs(title="Distribution of GCTI and ASHS scores by Race", 
+       x="Race", y="Score") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~variable, scales="free_y")
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+

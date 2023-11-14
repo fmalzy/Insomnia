@@ -1,0 +1,59 @@
+---
+title: "insomnia"
+author: "Jane Han"
+date: "2023-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Insomnia Data regression check 
+check the regression between two columns 
+columns: ISI_total - GCTI_total
+analysis: pearson correlation 
+
+
+```{r cars}
+#install.packages("utils")
+library(utils)
+
+setwd("/Users/mindmatter/Dropbox (Dartmouth College)/Courseworks/QBS181/Project_Insomnia")
+
+data <- read.csv("./data/insomnia_data_cleaned.csv", header = TRUE)
+
+# data check 
+#summary(data)
+#head(data)
+
+# Compute the Pearson correlation coefficient
+correlation_coefficient <- cor(data$ISI_total, data$GCTI_total, method = "pearson")
+
+# Print the result
+print(correlation_coefficient)
+
+correlation_test <- cor.test(data$ISI_total, data$GCTI_total)
+
+# Print the results
+print(correlation_test)
+```
+
+## Scatter Plot
+
+```{r pressure, echo=FALSE}
+
+# Scatter plot
+plot(data$ISI_total, data$GCTI_total, main="Scatter plot of ISI_total vs GCTI_total",
+     xlab="ISI_total", ylab="GCTI_total", col="blue", pch=16)
+
+# Add a regression line to the plot
+abline(lm(data$GCTI_total ~ data$ISI_total), col="red")
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Self Feedback for future analysis, notes
+[_] could just make a heatmap of all columns as well?
+

@@ -1,0 +1,626 @@
+---
+title: "181_Final Group Project"
+Author: Anything Health (Group Insomnia)
+output: pdf_document
+date: "2023-10-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparation ##
+*Please note that data cleaning and wrangling tasks were also executed using Excel prior to conducting the R analysis below. For more information on the Excel wrangling section, please refer back to our GitHub Repository: https://github.com/fmalzy/Insomnia/tree/main*
+
+```{r}
+# Set working directory 
+setwd("/Users/freyam/Desktop/Dartmouth/Courses/002 Fall Term/001_Core Courses/QBS 181 - Data Wrangling /Final Group Project/Codes and cleaned data")
+
+# Read in the data
+Insomnia <- read.csv("insomnia_data_cleaned.csv")
+
+# Dataset inspection
+head(Insomnia)
+colnames(Insomnia)
+```
+## Data Cleaning ##
+
+```{r}
+library(mice) 
+
+# Impute missing data using the mice package
+mice_mod <- mice(Insomnia, m = 1, method = 'pmm', maxit = 5)
+Insomnia_clean <- complete(mice_mod)
+
+# Remove rows with any missing value if still present
+Insomnia_clean <- Insomnia_clean %>% 
+  drop_na()
+
+# Save the cleaned dataset
+write.csv(Insomnia_clean, "Insomnia_final.csv", row.names = FALSE)
+```
+
+```{r}
+# Read in the final dataset again
+Insomnia_Final <- read.csv("Insomnia_final.csv")
+
+# Dataset inspection
+head(Insomnia_Final)
+```
+
+## Preliminary Step No.1: Compare Age and Race by subgroups ##
+We first delved into our dataset by examining its structure, focusing on comparing Age and Race across various subgroups.
+
+There are 3 different sub-groups in this dataset:
+*0 = Control*: Individuals who do not have insomnia. 
+
+*1 = Clean Insomnia*: Individuals who meet all the criteria for a diagnosis of insomnia without having other complciating factors or conditions (e.g., individuals who have sleep issues that are not caused by another mental health condition, medication, or a medical problem)
+
+*2 = Sub-clinical Insomnia*: Individuals who have symptoms of insomnia, but these symptoms do not meet the full diagnostic criteria for clinical insomnia. (e.g., these symptoms are less severe, do not occur as frequently, or have not been occuring for long enough to warrant a full diagnosis of insomnia. However, people with sub-clinical insomnia may still experience significant distress or impairment in daytime functioning, but not to the extent where it would be considered a clinical disorder)
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(viridis)
+
+# Combine individual race columns into one for the Insomnia_Final dataframe
+Insomnia_Final <- Insomnia_Final %>%
+  mutate(
+    Race = case_when(
+      American_Indian == 1 ~ "American_Indian",
+      Asian == 1 ~ "Asian",
+      Native_Hawaiian == 1 ~ "Native_Hawaiian",
+      Black == 1 ~ "Black",
+      White == 1 ~ "White",
+      TRUE ~ "Other"
+    )
+  )
+
+# Density plot for age distribution within each race 
+densityplot_age_by_race <- ggplot(Insomnia_Final, aes(x = Age, fill = Race)) +
+  geom_density(alpha = 0.7) + 
+  scale_fill_viridis(discrete = TRUE) + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"), 
+    legend.position = "bottom" 
+  ) +
+  labs(
+    title = "Age Distribution by Race",
+    x = "Age",
+    y = "Density"
+  )
+
+# Bar plot for subgroup distribution by race with subgroup names and smaller labels
+barplot_group_by_race <- ggplot(Insomnia_Final, aes(x = as.factor(SubGroup), fill = Race)) +
+  geom_bar(position = position_dodge()) + 
+  scale_fill_viridis(discrete = TRUE) + 
+  scale_x_discrete(labels = c("0" = "0 = Control", "1" = "1 = Clean Insomnia", "2" = "2 = Sub-clinical Insomnia")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"), 
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "plain", size = 8)  
+  ) +
+  labs(
+    title = "SubGroup Distribution by Race",
+    x = "SubGroup",
+    y = "Count"
+  )
+
+# Render the plots
+print(densityplot_age_by_race)
+print(barplot_group_by_race)
+```
+*Key Findings*: 
+Based on the 'Age Distribution by Race' plot above, we can see that Both 'White' and 'Asian' age distribution are pretty evenly spread whereas 'American Indian' almost only has age 18-19 dataset. However, since this entire analysis is based on adolescent, 'Age' won't be our main focus here and we would only use it as a reference for future analysis.
+
+As shown in the 'SubGroup Distribution by Race' plot above, we do not have all races in each group (only ‘White’ and ‘Asian’ are presented in all three sub groups), which brings us the question of whether to include every single race in our future analysis.
+
+Now, we will move on to perform some battery tests to compare and test correlations to see what variables are suitable for the analysis. Please note that all variables are randomly chosen from the dataset and not all variables are included in the combinations.
+
+```{r}
+# List of variable combinations 
+combinations <- list(
+  c("GCTI_total", "NEO_agreeableness"),
+  c("ASHS_total", "NEO_neuroticism"),
+  c("ISI_total", "NEO_extraversion"),
+  c("PSQI_total", "NEO_openness"),
+  c("BDI_total", "MEQr_total"),
+  c("ASHS_physiological", "PSRS_total"),
+  c("ASHS_cognitive", "NEO_Conscientiousness"),
+  c("ASHS_emotional", "PSS_total"),
+  c("ASHS_SleepEnvirnmont", "TCQI_R_Total"),
+  c("ASHS_DaytimeSleep", "TCQIR_cognitive_distraction"),
+  c("ASHS_substances", "NEO_agreeableness"),
+  c("ASHS_bedtimeRoutine", "ZNEO_neuroticism"),
+  c("ASHS_sleepStability", "ZNEO_openness"),
+  c("ASHS_BedroomSharing", "ZPSRS_RSE"),
+  c("GCTI_anxiety", "ZTCQIR_reappraisal"),
+  c("GCTI_reflection", "ZSTAI_Y_total"),
+  c("GCTI_worries", "Zders_awareness"),
+  c("GCTI_thoughts", "ZDERS_total")
+)
+
+# Function to plot each combination
+plot_combination <- function(vars) {
+  ggplot(Insomnia, aes_string(x=vars[1], y=vars[2])) + 
+    geom_point(aes(color=Race), alpha=0.6) +
+    geom_smooth(method="lm", se=FALSE, color="black") +
+    labs(title=paste("Scatter Plot of", vars[1], "and", vars[2]), 
+         x=vars[1], 
+         y=vars[2]) +
+    theme_minimal()
+}
+
+# Generate and display plots
+lapply(combinations, plot_combination)
+
+```
+
+# Variable Selection #
+Since variables above are only randomly selected and it's not efficient to generate all plots combination all at once, we can now conduct a pairwise correlation test among all variables to perform variable selection.
+
+```{r}
+# List of column names to calculate pairwise correlations
+columns_to_analyze <- c("PDS_FEMALE", "PDS_MALE", "ISI_total", "PSQI_total", "BDI_total",
+                        "ASHS_total", "ASHS_physiological", "ASHS_cognitive", "ASHS_emotional", 
+                        "ASHS_SleepEnvirnmont", "ASHS_DaytimeSleep", "ASHS_substances", 
+                        "ASHS_bedtimeRoutine", "ASHS_sleepStability", "ASHS_BedroomSharing", 
+                        "DBAS_total", "FIRST_total", "GCTI_total", "GCTI_anxiety", "GCTI_reflection",
+                        "GCTI_worries", "GCTI_thoughts", "GCTI_negativeAffect", "STAI_Y_total", 
+                        "NEO_neuroticism", "NEO_extraversion", "NEO_openness", "NEO_agreeableness", 
+                        "NEO_Conscientiousness", "MEQr_total", "PSRS_PrR", "PSRS_RWO", "PSRS_RSC", 
+                        "PSRS_FRa", "PSRS_RSE", "PSRS_total", "PSS_total", "TCQI_R_Total", 
+                        "TCQIR_Aggressive_supression", "TCQIR_cognitive_distraction", "TCQIR_reappraisal", 
+                        "TCQIR_behavtioral_distraction", "TCQIR_social_avoidance", "TCQIR_worry", 
+                        "ACE_tot", "asq_home", "asq_school", "asq_attendance", "asq_romantic", "asq_peer",
+                        "asq_teacher", "asq_future", "asq_leisure", "asq_finance", "asq_responsibility",
+                        "casq_total", "casq_sleepy", "casq_alert", "cope_disengage_su", "cope_growth",
+                        "cope_disengage_mental", "cope_emotions", "cope_socialsupp_instr", "cope_active",
+                        "cope_denial", "cope_religion", "cope_humor", "cope_disengage_emo", "cope_restraint",
+                        "cope_socialsupp_emo", "cope_acccept", "cope_suppression", "cope_planning",
+                        "ders_nonaccpetance", "ders_total", "ders_goals", "ders_impulse", "ders_awareness",
+                        "ders_strategies", "ders_clarity")
+
+# Create an empty list to store the results
+correlation_results <- list()
+
+# Generate all combinations of the column names
+column_combinations <- combn(columns_to_analyze, 2)
+
+# Function to calculate Pearson correlation for a pair
+calculate_correlation <- function(column_pair) {
+  col1 <- Insomnia[[column_pair[1]]]
+  col2 <- Insomnia[[column_pair[2]]]
+  complete_cases <- complete.cases(col1, col2)
+  
+  # Check if there are enough complete cases
+  if (sum(complete_cases) > 2) {  # More than two observations are needed to calculate correlation
+    result <- cor.test(col1[complete_cases], col2[complete_cases], method = "pearson")
+    return(list(column_pair = column_pair, correlation_coefficient = result$estimate, 
+                p_value = result$p.value, method = "pearson"))
+  } else {
+    return(list(column_pair = column_pair, correlation_coefficient = NA, 
+                p_value = NA, method = "pearson", 
+                warning = "Not enough finite observations"))
+  }
+}
+
+# Apply the function to each pair
+correlation_results <- apply(column_combinations, 2, calculate_correlation)
+
+# Convert the results to a data frame, including a warning column for pairs with insufficient data
+correlation_df <- do.call(rbind, lapply(correlation_results, function(x) {
+  data.frame(column1 = x$column_pair[1], column2 = x$column_pair[2],
+             correlation_coefficient = x$correlation_coefficient,
+             p_value = x$p_value, warning = ifelse(is.na(x$correlation_coefficient), x$warning, ""))
+}))
+
+# View the dataframe
+head(correlation_df,10)
+#view(correlation_df)
+```
+
+Based on our the above battery tests, variable selections, and our defined data dictionaries, we have chosen the following variables for further investigation: 
+
+*ISI_total*: Insomnia severity Index
+*BDI_total*: Becks Depression Inventory
+*GCTI_total*: The Glasgow Content of Thoughts Inventory (e.g., anxiety, reflection, worries, thoughts, negativeAffect)
+*ASHS_total*: Adolescent Sleep Hygiene Scale (e.g., physiological, emotional, SleepEnvironment, Substances, bedtimeRoutine)
+
+```{r}
+library(GGally)
+library(ggplot2)
+
+# Define the columns of interest
+cols_of_interest <- c("ISI_total", "BDI_total", "GCTI_total", "ASHS_total")
+
+# Create the scatter plot matrix with a specified color
+scatter_plot_matrix <- ggpairs(
+  Insomnia_Final[, cols_of_interest],
+  lower = list(
+    continuous = wrap("points", color = "steelblue", alpha = 0.5) 
+  ),
+  upper = list(
+    continuous = wrap("cor", color = "darkred")  
+  ),
+  diag = list(
+    continuous = wrap("barDiag", fill = "#132B43") 
+  )
+)
+
+# Print the plot
+print(scatter_plot_matrix)
+```
+*Key Findings*: 
+Positive Correlations: (For example) As the level of depression increases, the severity of Insomnia will also increase.Negative Correlations: (For example) As the level of depression increases, the adolescent sleep hygiene scale (sleep environment, the use of substances, bedtime routines) will decrease.In summary, insomnia, depression, as well as the thoughts inventory all have positive correlations, whereas the ASHS_total score (physiological factors) has negative correlations with all three other variables.
+
+After investigating the total scores, we can now dig deeper into individual psychological factors and how they affect the severity of insomnia and depression. For example, since we are particularly interested in anxiety, worries, sleep stability, and the use of substances, we will examine the following four variables in relationship with insomnia and depression severity.
+
+```{r}
+library(gridExtra)
+library(ggplot2)
+
+# Define the variables and titles
+variables <- c("ASHS_sleepStability", "ASHS_substances", "GCTI_anxiety", "GCTI_worries")
+titles <- c("Insomnia Severity", "Insomnia Severity", "Depression", "Depression")
+
+# Define a function to plot different plots into one grid
+plot_variable <- function(df, x_var, y_var, title_prefix) {
+  p <- ggplot(df, aes_string(x = x_var, y = y_var)) +
+    geom_point(aes_string(color = x_var), alpha = 0.6) +
+    geom_smooth(method = "lm", se = FALSE, color = "steelblue") +
+    labs(title = paste(title_prefix, "vs", x_var),
+         x = x_var,
+         y = y_var) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 10), 
+      axis.title = element_text(size = 10), 
+      legend.position = "right", 
+      legend.background = element_rect(fill = "white", colour = "grey50"),
+      legend.text = element_text(size = 5), 
+      legend.title = element_text(face = "bold", size = 7), 
+      legend.key.size = unit(0.5, "lines") 
+    )
+  return(p)
+}
+
+# Create a list to hold plots
+plot_list <- list()
+
+# Generate plots
+for (i in 1:length(variables)) {
+  if (titles[i] == "Insomnia Severity") {
+    plot_list[[i]] <- plot_variable(Insomnia_Final, variables[i], "ISI_total", titles[i])
+  } else {
+    plot_list[[i]] <- plot_variable(Insomnia_Final, variables[i], "BDI_total", titles[i])
+  }
+}
+
+# Arrange the plots in a grid
+do.call(gridExtra::grid.arrange, c(plot_list, ncol = 2))
+```
+*Key Findings*: 
+There are 3 positive correlations and 1 negative correlation in the grid on the left-hand side, indicating that only Insomnia Severity and sleep stability is negatively correlated (As the score of sleep stability increases, the level of insomnia severity decreases, which makes a lot of sense because both teenagers and adults need to sleep well in order to avoid insomnia and even depression)
+
+We are now ready to conduct our actual aims: 
+
+# Aim #1 (1.1) Part A #
+
+We can first take a look at GCTI and ASHS score distributions for different ages and races.
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+
+# Set the base theme for our plots
+base_theme <- theme_minimal() +
+              theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14, family = "Arial"),
+                    plot.subtitle = element_text(hjust = 0.5))
+color_palette <- scale_fill_brewer(palette = "Blues") 
+
+# GCTI Score Distribution by Race
+gcti_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = GCTI_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "GCTI Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# ASHS Score Distribution by Race
+ashs_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = ASHS_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "ASHS Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# Relationship between Age, GCTI, and ASHS Scores with Race color distinction
+age_gcti_ashs_scatter <- ggplot(Insomnia_Final, aes(x = Age, y = GCTI_total, color = Race)) +
+  geom_point(aes(size = ASHS_total), alpha = 0.6) +
+  geom_smooth(aes(y = GCTI_total), method = "lm", se = FALSE, color = "black") +
+  labs(title = "Relationship between Age, GCTI, and ASHS Scores") +
+  scale_color_brewer(palette = "Blues") + 
+  base_theme +
+  theme(legend.title = element_text(size = 8, face = "bold"),
+        legend.text = element_text(size = 8))
+
+# Arrange the boxplots in a grid for better comparison
+grid.arrange(gcti_race_boxplot, ashs_race_boxplot, nrow = 2)
+
+# Print the scatter plot
+print(age_gcti_ashs_scatter)
+
+```
+
+# Aim #1 (1.1) Part B #
+
+We can now take a look at GCTI and ASHS score distributions for different subgroups.
+
+```{r}
+# Load necessary library for grid arranging
+library(gridExtra)
+
+# Update the ggplot calls to add labels for subgroups
+gcti_boxplot <- ggplot(Insomnia_Final, aes(x = factor(SubGroup), y = GCTI_total, fill = factor(SubGroup))) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("#1f77b4", "#aec7e8", "darkgrey")) +  
+  scale_x_discrete(labels = c("0" = "Control", "1" = "Clean Insomnia", "2" = "Sub-clinical Insomnia")) +  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "none"
+  ) +
+  labs(
+    title = "GCTI Score Distribution by Subgroup",
+    x = "Subgroup",
+    y = "GCTI Score"
+  )
+
+ashs_boxplot <- ggplot(Insomnia_Final, aes(x = factor(SubGroup), y = ASHS_total, fill = factor(SubGroup))) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("#1f77b4", "#aec7e8", "darkgrey")) +  
+  scale_x_discrete(labels = c("0" = "Control", "1" = "Clean Insomnia", "2" = "Sub-clinical Insomnia")) +  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "none"
+  ) +
+  labs(
+    title = "ASHS Score Distribution by Subgroup",
+    x = "Subgroup",
+    y = "ASHS Score"
+  )
+
+# Combine the plots into a grid
+combined_plots <- grid.arrange(gcti_boxplot, ashs_boxplot, nrow = 2)
+
+# Print the combined plot grid
+print(combined_plots)
+
+```
+*Key Findings*: 
+For the distribution by subgroup plot, ‘Sub-clinical Insomnia (Sub group 2)’ has the highest median score for thoughts inventory factors, which might imply more severe cognitive impacts or a greater need for cognitive therapy. For the sleep hygiene factors however, it is the other way around. We will go over what they each mean more in depth in our discussion section.
+
+# Aim #1 (1.2) Part A #
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+# Select variables starting with GCTI and ASHS along with ISI_total and BDI_total for the correlation matrix
+selected_vars <- Insomnia_Final %>%
+  select(ISI_total, BDI_total, starts_with("GCTI"), starts_with("ASHS"))
+
+# Compute correlation matrix
+cor_matrix <- cor(selected_vars, use = "complete.obs")
+
+# Melt the correlation matrix for ggplot2
+cor_data <- melt(cor_matrix)
+
+# Define specific colors for blue-white-red gradient
+blue_white_red_colors <- c("#132B43", "steelblue", "white", "indianred1", "#B2182B")
+
+# Visualize the correlation matrix
+correlation_matrix_heatmap <- ggplot(data = cor_data, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") + 
+  geom_text(aes(label = sprintf("%.2f", value)), vjust = 1, color = "black", size = 2.5) + 
+  scale_fill_gradientn(colors = blue_white_red_colors,
+                       limits = c(-1, 1),
+                       breaks = c(-1, -0.5, 0, 0.5, 1),
+                       labels = c("-1", "-0.5", "0", "0.5", "1"),
+                       name="Pearson\nCorrelation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.text.y = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  labs(title = "Correlation Matrix Heatmap") +
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1.5))
+
+# Print the plot
+print(correlation_matrix_heatmap)
+```
+We have perfect positive correlations when it equals to 1 or red, perfect negative correlations when it equals to -1 or blue, and the values and different colors schemes in between. 
+
+*Key findings*: 
+There are relatively strong positive correlations between the insomnia severity index and the depression index, as well as the thoughts inventory factors such as anxiety, reflection, and negative affect. This finding suggests a relationship between cognitive and hypnosis-related factors and the severity of insomnia symptoms.
+
+Sleep hygiene factors (except for the use of substances) however, are mostly negatively correlated with the severity of insomnia, which suggests that as the level of sleep stability, bedtime routine increases, the severity of insomnia decreases. 
+
+
+# Aim #2 (2.1) Part A #
+
+Now moving to our Aim #2, which is to predict depression based on insomnia and sleep hygiene, we approached this aim with running the ANOVA test (i.e., two-ways, three-ways, and four-ways) to find their significance. We will first start with a two-way ANOVA test with the Insomnia Severity Index (ISI), GCTI (Thought Inventories), BDI (Depression Index), and the sleep hygiene scale.
+
+```{r}
+# Create a new race factor variable where 1 represents 'White' and 2 represents 'Asian'
+Insomnia_Final$Race <- NA  # Create an empty column for race
+Insomnia_Final$Race[Insomnia_Final$White == 1] <- 'White'
+Insomnia_Final$Race[Insomnia_Final$Asian == 1] <- 'Asian'
+
+# Convert the new Race column to a factor
+Insomnia_Final$Race <- factor(Insomnia_Final$Race)
+
+# Now, select only the rows where Race is 'Asian' or 'White'
+Insomnia_Final_subset <- Insomnia_Final[Insomnia_Final$Race %in% c('Asian', 'White'), ]
+
+# Run a two-way ANOVA with Race and ISI_total 
+result_gcti_isi <- aov(ISI_total ~ Race + GCTI_total + Race:GCTI_total, data = Insomnia_Final_subset)
+summary(result_gcti_isi)
+
+```
+# Aim #2 (2.1) Part B #
+
+```{r}
+# Run a two-way ANOVA with Race and ISI_total
+result_isi_bdi <- aov(BDI_total ~ Race + ISI_total + Race:ISI_total, data = Insomnia_Final_subset)
+summary(result_isi_bdi)
+```
+# Aim #2 (2.1) Part C #
+
+```{r}
+# Run a two-way ANOVA with Race and ISI_total
+result_ashs_bdi <- aov(BDI_total ~ Race + ASHS_total + Race:ASHS_total, data = Insomnia_Final_subset)
+summary(result_ashs_bdi)
+```
+Based on these results, we can see that race effect was not significant, while the insomnia severity level and sleep hygiene were significantly correlated with depression level.
+
+# Aim #2 (2.1) Part D #
+
+```{r}
+# Interaction plot for Race and ISI_total
+ggplot(Insomnia_Final_subset, aes(x = ISI_total, y = BDI_total, color = Race, group = Race)) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color ="grey") +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  labs(title = "Interaction of Race, Insomnia Severity, and Depression", x = "ISI_total", y = "BDI_total")
+
+# Interaction plot for Race and ASHS_total
+ggplot(Insomnia_Final_subset, aes(x = ASHS_total, y = BDI_total, color = Race, group = Race)) +
+  geom_smooth(aes(y = BDI_total), method = "lm", se = FALSE, color ="grey") +
+  geom_point(aes(color = Race), alpha = 0.6) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  labs(title = "Interaction of Race, Sleep Hygiene, and Depression", x = "ASHS_total", y = "BDI_total")
+```
+Again, based on the visualization shown above, it re-emphazie on the idea that race effect is not significant enough to determine a relationship between Race and Insomnia, and therefore cannot be used as a predictor to make prediction for Insomnia. 
+
+Please also note that only 'White' and 'Asian' are chosen here for the two-way ANOVA test based on previous data explorations and preliminary steps (e.g., since other races might not have data presented in all subgroups).
+
+# Aim #2 (2.2) # 
+
+To further investigate on their relationships, we will perform interaction of depression, insomnia, sleep hygiene and race on a three-way ANOVA test.
+
+```{r}
+Insomnia_Final$Race <- factor(Insomnia_Final$Race)
+
+# Perform the three-way ANOVA
+three_way_anova_result <- aov(BDI_total ~ Race * ISI_total * ASHS_total, data = Insomnia_Final)
+
+# Get the summary of the ANOVA
+summary(three_way_anova_result)
+```
+Based on this three-way ANOVA result, we can see that the race did not correlate with other sleep factors again. It is interesting to note that three way interaction effect were marginally more significant than the two-way ANOVA test.
+
+For better comparison, we generated a R Shiny Dashboard to see the difference and changes from an one-way ANOVA analysis to a three-way ANOVA analysis among our chosen variables.
+
+```{r}
+library(shiny)
+library(ggplot2)
+
+# Define UI for the dashboard
+ui <- fluidPage(
+    titlePanel("ANOVA Comparisons on Insomnia Data"),
+    
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("anovaType", "Select ANOVA Type:",
+                        choices = c("One-Way", "Two-Way", "Three-Way")),
+            selectInput("dependentVar", "Dependent Variable", 
+                        choices = c("BDI_total", "ISI_total", "ASHS_total", "GCTI_total")),
+            selectInput("independentVar1", "Independent Variable 1", 
+                        choices = c("Race", "BDI_total", "ISI_total", "ASHS_total", "GCTI_total")),
+            selectInput("independentVar2", "Independent Variable 2", 
+                        choices = c("Race", "BDI_total", "ISI_total", "ASHS_total", "GCTI_total")),
+            selectInput("independentVar3", "Independent Variable 3", 
+                        choices = c("Race", "BDI_total", "ISI_total", "ASHS_total", "GCTI_total"))
+        ),
+        
+        mainPanel(
+           textOutput("anovaResult"),
+           plotOutput("plot")
+        )
+    )
+)
+
+# Define server logic
+server <- function(input, output) {
+
+    output$anovaResult <- renderText({
+        anovaType <- input$anovaType
+        dependentVar <- input$dependentVar
+        independentVar1 <- input$independentVar1
+        independentVar2 <- input$independentVar2
+        independentVar3 <- input$independentVar3
+        
+        if(anovaType == "One-Way") {
+            result <- summary(aov(as.formula(paste(dependentVar, "~", independentVar1)), data = Insomnia_Final))
+        } else if(anovaType == "Two-Way") {
+            result <- summary(aov(as.formula(paste(dependentVar, "~", independentVar1, "*", independentVar2)), data = Insomnia_Final))
+        } else {
+            result <- summary(aov(as.formula(paste(dependentVar, "~", independentVar1, "*", independentVar2, "*", independentVar3)), data = Insomnia_Final))
+        }
+        
+        return(capture.output(print(result)))
+    })
+
+    output$plot <- renderPlot({
+        anovaType <- input$anovaType
+        dependentVar <- input$dependentVar
+        independentVar1 <- input$independentVar1
+        independentVar2 <- input$independentVar2
+        independentVar3 <- input$independentVar3
+        
+        if(anovaType == "One-Way") {
+            ggplot(Insomnia_Final, aes_string(x = independentVar1, y = dependentVar)) + 
+                geom_boxplot() +
+                labs(title = "One-Way ANOVA", x = independentVar1, y = dependentVar)
+        } else if(anovaType == "Two-Way") {
+            ggplot(Insomnia_Final, aes_string(x = independentVar1, y = dependentVar, fill = independentVar2)) + 
+                geom_boxplot() +
+                labs(title = "Two-Way ANOVA", x = independentVar1, y = dependentVar)
+        } else {
+            ggplot(Insomnia_Final, aes_string(x = independentVar1, y = dependentVar, color = independentVar3)) +
+                geom_point() +
+                labs(title = "Three-Way ANOVA", x = independentVar1, y = dependentVar)
+        }
+    })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+```
+
+```{r}
+# Machine learning appraoch to predict depression based on insomnia and sleep hygiene
+
+
+
+```
+
+
+```{r}
+
+
+
+```
+
+## The End of the Tutorial ##
+

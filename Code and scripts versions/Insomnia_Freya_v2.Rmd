@@ -1,0 +1,523 @@
+---
+title: "181_Final Group Project"
+Author: Anything Health (Group Insomnia)
+output: pdf_document
+date: "2023-10-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparation ##
+*Please note that previous data cleaning and wrangling processes have also been performed in Excel prior to this R analysis*
+
+```{r}
+
+# Set working directory 
+setwd("/Users/freyam/Desktop/Dartmouth/Courses/002 Fall Term/001_Core Courses/QBS 181 - Data Wrangling /Final Group Project/Codes and cleaned data")
+
+# Read in the data
+Insomnia <- read.csv("insomnia_data_cleaned.csv")
+
+# Dataset inspection
+head(Insomnia)
+colnames(Insomnia)
+
+```
+
+## Data Cleaning ##
+
+```{r}
+library(mice) 
+
+# Impute missing data using the mice package
+mice_mod <- mice(Insomnia, m = 1, method = 'pmm', maxit = 5)
+Insomnia_clean <- complete(mice_mod)
+
+# Remove rows with any missing value if still present
+Insomnia_clean <- Insomnia_clean %>% 
+  drop_na()
+
+# Save the cleaned dataset
+write.csv(Insomnia_clean, "Insomnia_final.csv", row.names = FALSE)
+
+```
+
+```{r}
+# Read in the final dataset again
+Insomnia_Final <- read.csv("Insomnia_final.csv")
+
+# Dataset inspection
+head(Insomnia_Final)
+
+```
+
+## Preliminary Step No.1: Compare Age and Race by subgroups ##
+There are 3 different sub-groups in this dataset:
+- 0: Control
+- 1: Clean Insomnia
+- 2: Sub-clinical Insomnia
+
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(viridis)
+
+# Combine individual race columns into one for the Insomnia_Final dataframe
+Insomnia_Final <- Insomnia_Final %>%
+  mutate(
+    Race = case_when(
+      American_Indian == 1 ~ "American_Indian",
+      Asian == 1 ~ "Asian",
+      Native_Hawaiian == 1 ~ "Native_Hawaiian",
+      Black == 1 ~ "Black",
+      White == 1 ~ "White",
+      TRUE ~ "Other"
+    )
+  )
+
+# Density plot for age distribution within each race 
+densityplot_age_by_race <- ggplot(Insomnia_Final, aes(x = Age, fill = Race)) +
+  geom_density(alpha = 0.7) + 
+  scale_fill_viridis(discrete = TRUE) + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"), 
+    legend.position = "bottom" 
+  ) +
+  labs(
+    title = "Age Distribution by Race",
+    x = "Age",
+    y = "Density"
+  )
+
+# Bar plot for subgroup distribution by race 
+barplot_group_by_race <- ggplot(Insomnia_Final, aes(x = SubGroup, fill = Race)) +
+  geom_bar(position = position_dodge()) + 
+  scale_fill_viridis(discrete = TRUE) + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"), 
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1) 
+  ) +
+  labs(
+    title = "SubGroup Distribution by Race",
+    x = "SubGroup",
+    y = "Count"
+  )
+
+# Render the plots
+print(densityplot_age_by_race)
+print(barplot_group_by_race)
+
+```
+
+We can now take a look at the two most important variables (e.g., "ISI_total: Insomnia severity Index" and "BDI_total: Becks Depression Inventory") across ages and races to have a better understanding of our data structure.
+
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+library(viridis)
+library(gridExtra)
+
+
+# Create a long format dataframe to include both ISI_total and BDI_total
+long_data <- Insomnia_Final %>%
+  select(Age, Race, ISI_total, BDI_total) %>%
+  gather(key = "ScoreType", value = "Score", -Age, -Race)
+
+# Scatterplot for both ISI_total and BDI_total vs Age, faceted by Race and ScoreType
+scatterplot_age_scores <- ggplot(long_data, aes(x = Age, y = Score, color = Race)) +
+  geom_point(alpha = 0.6, size = 3) +
+  facet_grid(ScoreType ~ Race, scales = "free_y") +
+  scale_color_viridis(discrete = TRUE) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"), 
+    legend.position = "bottom"
+  ) +
+  labs(
+    title = "Total Scores by Age and Race",
+    x = "Age",
+    y = "Total Score"
+  )
+
+# Render the plot
+print(scatterplot_age_scores)
+
+```
+
+Now, we will move on to perform some battery tests to compare and test correlations to see what variables are suitable for the analysis. Please note that all variables are randomly chosen from the dataset and not all variables are included in the combinations.
+
+```{r}
+
+# List of variable combinations 
+combinations <- list(
+  c("GCTI_total", "NEO_agreeableness"),
+  c("ASHS_total", "NEO_neuroticism"),
+  c("ISI_total", "NEO_extraversion"),
+  c("PSQI_total", "NEO_openness"),
+  c("BDI_total", "MEQr_total"),
+  c("ASHS_physiological", "PSRS_total"),
+  c("ASHS_cognitive", "NEO_Conscientiousness"),
+  c("ASHS_emotional", "PSS_total"),
+  c("ASHS_SleepEnvirnmont", "TCQI_R_Total"),
+  c("ASHS_DaytimeSleep", "TCQIR_cognitive_distraction"),
+  c("ASHS_substances", "NEO_agreeableness"),
+  c("ASHS_bedtimeRoutine", "ZNEO_neuroticism"),
+  c("ASHS_sleepStability", "ZNEO_openness"),
+  c("ASHS_BedroomSharing", "ZPSRS_RSE"),
+  c("GCTI_anxiety", "ZTCQIR_reappraisal"),
+  c("GCTI_reflection", "ZSTAI_Y_total"),
+  c("GCTI_worries", "Zders_awareness"),
+  c("GCTI_thoughts", "ZDERS_total")
+)
+
+# Function to plot each combination
+plot_combination <- function(vars) {
+  ggplot(Insomnia, aes_string(x=vars[1], y=vars[2])) + 
+    geom_point(aes(color=Race), alpha=0.6) +
+    geom_smooth(method="lm", se=FALSE, color="black") +
+    labs(title=paste("Scatter Plot of", vars[1], "and", vars[2]), 
+         x=vars[1], 
+         y=vars[2]) +
+    theme_minimal()
+}
+
+# Generate and display plots
+lapply(combinations, plot_combination)
+
+```
+Based on our the above battery tests and our defined data dictionaries, we have chosen the following variables for further investigation: 
+
+- ISI_total: Insomnia severity Index
+- BDI_total: Becks Depression Inventory
+- GCTI_total: The Glasgow Content of Thoughts Inventory (e.g., anxiety, reflection, worries, thoughts, negativeAffect)
+- ASHS_total: Adolescent Sleep Hygiene Scale (e.g., physiological, emotional, SleepEnvironment, Substances, bedtimeRoutine)
+
+
+```{r}
+
+library(GGally)
+library(ggplot2)
+
+# Define the columns of interest
+cols_of_interest <- c("ISI_total", "BDI_total", "GCTI_total", "ASHS_total")
+
+# Create the scatter plot matrix with a specified color
+scatter_plot_matrix <- ggpairs(
+  Insomnia_Final[, cols_of_interest],
+  lower = list(
+    continuous = wrap("points", color = "steelblue", alpha = 0.5) 
+  ),
+  upper = list(
+    continuous = wrap("cor", color = "darkred")  
+  ),
+  diag = list(
+    continuous = wrap("barDiag", fill = "#132B43") 
+  )
+)
+
+# Print the plot
+print(scatter_plot_matrix)
+
+```
+
+After investigating the total scores, we can now dig deeper into individual psychological factors and how they affect the severity of insomnia and depression. 
+
+For example, since we are particularly interested in anxiety, worries, sleep stability, and the use of substances, we will examine the following four variables in relationship with insomnia and depression severity.
+
+```{r}
+library(gridExtra)
+library(ggplot2)
+
+# Define the variables and titles
+variables <- c("ASHS_sleepStability", "ASHS_substances", "GCTI_anxiety", "GCTI_worries")
+titles <- c("Insomnia Severity", "Insomnia Severity", "Depression", "Depression")
+
+# Define a function to plot different plots into one grid
+plot_variable <- function(df, x_var, y_var, title_prefix) {
+  p <- ggplot(df, aes_string(x = x_var, y = y_var)) +
+    geom_point(aes_string(color = x_var), alpha = 0.6) +
+    geom_smooth(method = "lm", se = FALSE, color = "steelblue") +
+    labs(title = paste(title_prefix, "vs", x_var),
+         x = x_var,
+         y = y_var) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 10), 
+      axis.title = element_text(size = 10), 
+      legend.position = "right", 
+      legend.background = element_rect(fill = "white", colour = "grey50"),
+      legend.text = element_text(size = 5), 
+      legend.title = element_text(face = "bold", size = 7), 
+      legend.key.size = unit(0.5, "lines") 
+    )
+  return(p)
+}
+
+# Create a list to hold plots
+plot_list <- list()
+
+# Generate plots
+for (i in 1:length(variables)) {
+  if (titles[i] == "Insomnia Severity") {
+    plot_list[[i]] <- plot_variable(Insomnia_Final, variables[i], "ISI_total", titles[i])
+  } else {
+    plot_list[[i]] <- plot_variable(Insomnia_Final, variables[i], "BDI_total", titles[i])
+  }
+}
+
+# Arrange the plots in a grid
+do.call(gridExtra::grid.arrange, c(plot_list, ncol = 2))
+
+```
+
+Aim #1 (1.1) Part A
+
+We can first take a look at GCTI and ASHS score distributions for different ages and races.
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+
+# Set the base theme for our plots
+base_theme <- theme_minimal() +
+              theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14, family = "Arial"),
+                    plot.subtitle = element_text(hjust = 0.5))
+color_palette <- scale_fill_brewer(palette = "Blues") 
+
+# GCTI Score Distribution by Race
+gcti_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = GCTI_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "GCTI Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# ASHS Score Distribution by Race
+ashs_race_boxplot <- ggplot(Insomnia_Final, aes(x = Race, y = ASHS_total, fill = Race)) +
+  geom_boxplot() +
+  labs(title = "ASHS Score Distribution by Race") +
+  color_palette +
+  base_theme +
+  theme(legend.position = "none")
+
+# Relationship between Age, GCTI, and ASHS Scores with Race color distinction
+age_gcti_ashs_scatter <- ggplot(Insomnia_Final, aes(x = Age, y = GCTI_total, color = Race)) +
+  geom_point(aes(size = ASHS_total), alpha = 0.6) +
+  geom_smooth(aes(y = GCTI_total), method = "lm", se = FALSE, color = "black") +
+  labs(title = "Relationship between Age, GCTI, and ASHS Scores") +
+  scale_color_brewer(palette = "Blues") + 
+  base_theme +
+  theme(legend.title = element_text(size = 8, face = "bold"),
+        legend.text = element_text(size = 8))
+
+# Arrange the boxplots in a grid for better comparison
+grid.arrange(gcti_race_boxplot, ashs_race_boxplot, nrow = 2)
+
+# Print the scatter plot
+print(age_gcti_ashs_scatter)
+
+```
+
+Aim #1 (1.1) Part B
+
+We can now take a look at GCTI and ASHS score distributions for different subgroups
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+# Create boxplots for GCTI distributions
+gcti_boxplot <- ggplot(Insomnia_Final, aes(x = factor(SubGroup), y = GCTI_total, fill = factor(SubGroup))) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("0" = "#1f77b4", "1" = "#aec7e8")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "none"
+  ) +
+  labs(
+    title = "GCTI Score Distribution by Subgroup",
+    x = "Subgroup",
+    y = "GCTI Score"
+  )
+
+# Create boxplots for ASHS distributions
+ashs_boxplot <- ggplot(Insomnia_Final, aes(x = factor(SubGroup), y = ASHS_total, fill = factor(SubGroup))) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("0" = "#1f77b4", "1" = "#aec7e8")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "none"
+  ) +
+  labs(
+    title = "ASHS Score Distribution by Subgroup",
+    x = "Subgroup",
+    y = "ASHS Score"
+  )
+
+# Combine the plots into a grid
+combined_plots <- grid.arrange(gcti_boxplot, ashs_boxplot, nrow = 2)
+
+# Print the combined plot grid
+print(combined_plots)
+
+```
+
+Aim #1 (1.2) Part A
+
+```{r}
+
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+# Select variables starting with GCTI and ASHS along with ISI_total and BDI_total for the correlation matrix
+selected_vars <- Insomnia_Final %>%
+  select(ISI_total, BDI_total, starts_with("GCTI"), starts_with("ASHS"))
+
+# Compute correlation matrix
+cor_matrix <- cor(selected_vars, use = "complete.obs")
+
+# Melt the correlation matrix for ggplot2
+cor_data <- melt(cor_matrix)
+
+# Define specific colors for blue-white-red gradient
+blue_white_red_colors <- c("#132B43", "steelblue", "white", "indianred1", "#B2182B")
+
+# Visualize the correlation matrix
+correlation_matrix_heatmap <- ggplot(data = cor_data, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") + 
+  geom_text(aes(label = sprintf("%.2f", value)), vjust = 1, color = "black", size = 2.5) + 
+  scale_fill_gradientn(colors = blue_white_red_colors,
+                       limits = c(-1, 1),
+                       breaks = c(-1, -0.5, 0, 0.5, 1),
+                       labels = c("-1", "-0.5", "0", "0.5", "1"),
+                       name="Pearson\nCorrelation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.text.y = element_text(angle = 45, vjust = 1, hjust=1),
+        axis.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  labs(title = "Correlation Matrix Heatmap") +
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1.5))
+
+# Print the plot
+print(correlation_matrix_heatmap)
+
+```
+
+Aim #1 (1.2) Part B (POTENTIALLY DELETE)
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(ggcorrplot)
+library(RColorBrewer)
+
+# Select only numerical variables for the correlation matrix
+selected_vars <- Insomnia_Final %>% 
+  select(Age, ISI_total, BDI_total, GCTI_total, ASHS_total)
+
+# Create a correlation matrix
+cor_mat <- cor(selected_vars, use = "complete.obs")
+
+# Define a blue color palette
+blue_palette <- colorRampPalette(c("#DCEBF7", "#6E9ECF", "#132B43"))(5)
+
+# Generate a heatmap of the correlation matrix 
+ggcorrplot(cor_mat, 
+           method = "circle", 
+           type = "lower", 
+           lab = TRUE, 
+           colors = blue_palette, 
+           lab_size = 3.5, 
+           tl.cex = 12,
+           tl.col = "black", 
+           tl.srt = 45, 
+           title = "Correlation matrix of selected variables",
+           ggtheme = theme_minimal(),
+           outline.color = "black"
+           ) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5)) + 
+  labs(fill = "Correlation")
+
+
+```
+
+Aim #2 (2.1)
+
+```{r}
+
+library(lme4) 
+
+# Predicting mental health from sleep quality using a linear model
+model <- lm(BDI_total ~ PSQI_total + Age + Sex + Race, data = Insomnia_Final)
+summary(model)
+
+```
+
+Aim #2 (2.2)
+
+```{r}
+
+library(lme4) 
+library(interactions)
+
+# Adding interaction between PSQI_total and Race in the model
+interaction_model <- lm(BDI_total ~ PSQI_total * Race, data = Insomnia_Final)
+summary(interaction_model)
+
+
+```
+
+Shiny Dashboard (Optional)
+
+```{r}
+
+# Loading necessary libraries
+library(shiny)
+library(shinydashboard)
+
+# Building the Shiny dashboard
+ui <- dashboardPage(
+  dashboardHeader(title = "Insomnia Analysis Dashboard"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Subgroup Analysis", tabName = "subgroup_analysis", icon = icon("user")),
+      menuItem("Regression Analysis", tabName = "regression_analysis", icon = icon("chart-line"))
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "subgroup_analysis",
+              fluidRow(
+                box(plotOutput("plotAgeRace"), width = 6),
+                box(plotOutput("plotHeatmap"), width = 6)
+              )),
+      tabItem(tabName = "regression_analysis",
+              fluidRow(
+                box(plotOutput("plotRegression"), width = 6),
+                box(plotOutput("plotInteraction"), width = 6)
+              ))
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$plotAgeRace <- renderPlot({ plot_age_race })
+  output$plotHeatmap <- renderPlot({ plot_heatmap })
+  output$}
+
+```
+
