@@ -31,7 +31,7 @@ This repository is dedicated to documenting the analysis of insomnia in adolesce
   - Activities: Reviewed and practiced the presentation, confirmed questions, and resolved confusion.
 
 #### Collaborators
-This project is the result of collaborative efforts by a talented team. Below are the contributors to this project along with our respective GitHub profile links:
+This project is the result of collaborative efforts by our team. Please find our respective GitHub profile links for your reference:
 - **[Freya Ma](https://github.com/fmalzy)** 
 - **[Jane Han](https://github.com/han-jane)** 
 - **[Joseph Nano](https://github.com/josephnano)** 
