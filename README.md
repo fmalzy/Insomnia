@@ -17,17 +17,17 @@ This repository is dedicated to documenting the analysis of insomnia in adolesce
 
 #### 10/26 Working Session
 - **Exploratory Analysis and Presentation Preparation**
-  - Contributors: Jane, Freya (Analysis), Joseph (Presentation)
+  - Contributors: Jane (Analysis), Freya (Analysis), Joseph (Analysis and Presentation)
   - Updates: R markdown files uploaded to the script folder.
 
 #### 10/31 Working Session
 - **Additional Analysis and Research**
-  - Contributors: Jane, Freya (Analysis), Joseph (Research)
+  - Contributors: Jane (Analysis), Freya (Analysis), Joseph (Research)
   - Discussion: Task splitting and planning next steps.
 
 #### 11/07 Working Session
 - **Final Analysis and Presentation Rehearsal**
-  - Contributors: Jane, Freya (Analysis), Joseph (Research), Ashlee (Presentation Review)
+  - Contributors: Jane (Analysis), Freya (Analysis), Joseph (Research), Ashlee (Presentation Review)
   - Activities: Reviewed and practiced the presentation, confirmed questions, and resolved confusion.
 
 #### Collaborators
